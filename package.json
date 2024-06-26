@@ -1,10 +1,10 @@
 {
-  "name": "streaming_wav_recorder",
+  "name": "streaming-wav-recorder",
   "version": "0.0.0",
   "browser": "dist/mic.bundle.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-username/your-repo.git"
+    "url": "git+https://github.com/farhan888/streaming_wav_recorder"
   },
   "scripts": {
     "build": "webpack",
