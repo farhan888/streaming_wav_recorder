@@ -8,10 +8,11 @@ export class CustomMic extends EventEmitter {
     /**
      * Create a CustomMic instance.
      * @param {number} [chunkSize=500] - Size of each audio chunk in milliseconds.
+     * @param {number} [sampleRate=16000] - Sample rate of audio capture in Hz.
      */
-    constructor(chunkSize = 500) {
+    constructor(chunkSize = 500, sampleRate = 16000) {
         super();
-        this.context = new AudioContext();
+        this.context = new AudioContext({"sampleRate": sampleRate});
         this.microphone = null;
         this.recorder = null;
         this.source = null;
@@ -37,7 +38,7 @@ export class CustomMic extends EventEmitter {
         // Connect nodes and handle recorded data
         this.source.connect(this.recorder).connect(this.context.destination);
         this.recorder.port.onmessage = (e) => {
-            console.log(e.data);
+            // console.log(e.data);
             this.emit('recordedData', e.data);
         };
     }
