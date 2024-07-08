@@ -48,7 +48,7 @@ export class CustomMic extends EventEmitter {
      */
     stopMic() {
         // Stop recording and disconnect nodes
-        this.recorder.port.postMessage('Stop');
+        this.recorder.port.postMessage('stop');
         if (this.recorder) {
             this.recorder.disconnect();
         }

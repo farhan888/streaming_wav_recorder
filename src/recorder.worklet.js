@@ -69,7 +69,7 @@ class RecorderProcessor extends AudioWorkletProcessor {
         //As of when this code was written microphone data was captured in 128 frames.
         //This might change in future and might need to be refactored.
         this.port.onmessage = (event) => {
-            if(event.data=="Stop"){
+            if(event.data=="stop"){
                 this.isFinalChunk = true;
                 this.flush();
             }          
