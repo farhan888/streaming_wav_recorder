@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>streaming-wav-recorder Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+      color: #1a1a2e;
+      background: #f8f9fa;
+    }
+
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    .subtitle { color: #6c757d; margin-bottom: 2rem; font-size: 0.9rem; }
+
+    .controls {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button:not(:disabled):hover { opacity: 0.85; }
+
+    .btn-start { background: #28a745; color: white; }
+    .btn-pause { background: #ffc107; color: #1a1a2e; }
+    .btn-stop { background: #dc3545; color: white; }
+
+    .stats {
+      background: white;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.4rem 0;
+      border-bottom: 1px solid #f1f3f5;
+    }
+
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { color: #6c757d; }
+    .stat-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .state-badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .state-inactive { background: #e9ecef; color: #495057; }
+    .state-recording { background: #d4edda; color: #155724; }
+    .state-paused { background: #fff3cd; color: #856404; }
+
+    .playback { margin-bottom: 1.5rem; }
+    .playback audio { width: 100%; margin-top: 0.5rem; }
+
+    .log {
+      background: #1a1a2e;
+      color: #a8dadc;
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.8rem;
+      max-height: 200px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+
+    .log-entry { opacity: 0.9; }
+    .log-entry.final { color: #f4a261; }
+
+    .source-link {
+      margin-top: 2rem;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+
+    .settings {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .settings label {
+      font-size: 0.85rem;
+      color: #495057;
+    }
+
+    .settings select {
+      padding: 0.3rem 0.4rem;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      background: white;
+    }
+
+    .source-link a { color: #4361ee; }
+  </style>
+</head>
+<body>
+  <h1>streaming-wav-recorder</h1>
+  <p class="subtitle">Stream microphone audio as WAV chunks using AudioWorklet</p>
+
+  <div class="settings">
+    <label>Chunk size: <select id="chunkSizeSelect">
+      <option value="100">100ms</option>
+      <option value="250">250ms</option>
+      <option value="500" selected>500ms</option>
+      <option value="1000">1000ms</option>
+      <option value="2000">2000ms</option>
+    </select></label>
+    <label>Sample rate: <select id="sampleRateSelect">
+      <option value="8000">8kHz</option>
+      <option value="16000" selected>16kHz</option>
+      <option value="44100">44.1kHz</option>
+      <option value="48000">48kHz</option>
+    </select></label>
+    <label>Format: <select id="formatSelect">
+      <option value="pcm" selected>PCM</option>
+      <option value="wav">WAV</option>
+    </select></label>
+  </div>
+
+  <div class="controls">
+    <button class="btn-start" id="startBtn">Start</button>
+    <button class="btn-pause" id="pauseBtn" disabled>Pause</button>
+    <button class="btn-stop" id="stopBtn" disabled>Stop</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat-row">
+      <span class="stat-label">State</span>
+      <span class="stat-value"><span id="stateBadge" class="state-badge state-inactive">inactive</span></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Chunks received</span>
+      <span class="stat-value" id="chunkCount">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Total bytes</span>
+      <span class="stat-value" id="totalBytes">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Duration</span>
+      <span class="stat-value" id="duration">0.0s</span>
+    </div>
+  </div>
+
+  <div class="playback" id="playbackSection" style="display: none;">
+    <strong>Playback</strong>
+    <audio id="audioPlayer" controls></audio>
+  </div>
+
+  <div class="log" id="log"></div>
+
+  <div class="source-link">
+    <a href="https://github.com/farhan888/streaming_wav_recorder" target="_blank">View source on GitHub</a>
+    &middot;
+    <a href="https://www.npmjs.com/package/streaming-wav-recorder" target="_blank">npm</a>
+  </div>
+
+  <script type="module">
+    // Using the built ESM module -- in production you'd import from 'streaming-wav-recorder'
+    import { WavStream } from '../dist/index.js';
+
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const stateBadge = document.getElementById('stateBadge');
+    const chunkCountEl = document.getElementById('chunkCount');
+    const totalBytesEl = document.getElementById('totalBytes');
+    const durationEl = document.getElementById('duration');
+    const logEl = document.getElementById('log');
+    const playbackSection = document.getElementById('playbackSection');
+    const audioPlayer = document.getElementById('audioPlayer');
+
+    let recorder = null;
+    let chunks = [];
+    let chunkCount = 0;
+    let totalBytes = 0;
+    let startTime = 0;
+    let timerInterval = null;
+
+    function log(msg, isFinal = false) {
+      const entry = document.createElement('div');
+      entry.className = 'log-entry' + (isFinal ? ' final' : '');
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function updateState(state) {
+      stateBadge.textContent = state;
+      stateBadge.className = `state-badge state-${state}`;
+
+      const isActive = state === 'recording' || state === 'paused';
+      startBtn.disabled = isActive;
+      pauseBtn.disabled = state === 'inactive';
+      pauseBtn.textContent = state === 'paused' ? 'Resume' : 'Pause';
+      stopBtn.disabled = state === 'inactive';
+      document.getElementById('chunkSizeSelect').disabled = isActive;
+      document.getElementById('sampleRateSelect').disabled = isActive;
+      document.getElementById('formatSelect').disabled = isActive;
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    startBtn.addEventListener('click', async () => {
+      if (!WavStream.isSupported()) {
+        log('AudioWorklet not supported in this browser');
+        return;
+      }
+
+      chunks = [];
+      chunkCount = 0;
+      totalBytes = 0;
+      chunkCountEl.textContent = '0';
+      totalBytesEl.textContent = '0';
+      playbackSection.style.display = 'none';
+
+      const chunkSize = parseInt(document.getElementById('chunkSizeSelect').value);
+      const sampleRate = parseInt(document.getElementById('sampleRateSelect').value);
+      const format = document.getElementById('formatSelect').value;
+
+      recorder = new WavStream({ chunkSize, sampleRate, format });
+
+      recorder.on('data', ([wavBytes, isFinal]) => {
+        chunks.push(wavBytes);
+        chunkCount++;
+        totalBytes += wavBytes.length;
+        chunkCountEl.textContent = chunkCount;
+        totalBytesEl.textContent = formatBytes(totalBytes);
+
+        log(`Chunk #${chunkCount}: ${formatBytes(wavBytes.length)}`, isFinal);
+
+        if (isFinal) {
+          log('Recording complete — final chunk received', true);
+        }
+      });
+
+      recorder.on('statechange', updateState);
+      recorder.on('error', (err) => log(`Error: ${err.message}`));
+
+      try {
+        await recorder.start();
+        startTime = Date.now();
+        timerInterval = setInterval(() => {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          durationEl.textContent = elapsed + 's';
+        }, 100);
+        log('Recording started');
+      } catch (err) {
+        log(`Failed to start: ${err.message}`);
+      }
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      if (!recorder) return;
+      if (recorder.state === 'paused') {
+        recorder.resume();
+        log('Resumed');
+      } else {
+        recorder.pause();
+        log('Paused');
+      }
+    });
+
+    stopBtn.addEventListener('click', () => {
+      if (!recorder) return;
+      recorder.stop();
+      clearInterval(timerInterval);
+      log('Stopped');
+
+      if (chunks.length > 0) {
+        const sRate = parseInt(document.getElementById('sampleRateSelect').value);
+        const fmt = document.getElementById('formatSelect').value;
+        let pcmBytes;
+
+        if (fmt === 'pcm') {
+          // Chunks are raw float32 PCM -- just concatenate
+          const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+          pcmBytes = new Uint8Array(totalLength);
+          let off = 0;
+          for (const chunk of chunks) { pcmBytes.set(chunk, off); off += chunk.length; }
+        } else {
+          // Chunks are standalone WAVs -- strip 44-byte headers, keep PCM
+          const pcmParts = chunks.map(c => c.slice(44));
+          const totalLength = pcmParts.reduce((sum, c) => sum + c.length, 0);
+          pcmBytes = new Uint8Array(totalLength);
+          let off = 0;
+          for (const part of pcmParts) { pcmBytes.set(part, off); off += part.length; }
+        }
+
+        // Wrap in a single WAV for the <audio> player
+        const header = new ArrayBuffer(44);
+        const dv = new DataView(header);
+        let p = 0;
+        const ws = (s) => { for (let i = 0; i < s.length; i++) dv.setUint8(p + i, s.charCodeAt(i)); p += s.length; };
+        const wu32 = (v) => { dv.setUint32(p, v, true); p += 4; };
+        const wu16 = (v) => { dv.setUint16(p, v, true); p += 2; };
+        ws('RIFF'); wu32(pcmBytes.length + 36); ws('WAVE');
+        ws('fmt '); wu32(16); wu16(3); wu16(1);
+        wu32(sRate); wu32(sRate * 4); wu16(4); wu16(32);
+        ws('data'); wu32(pcmBytes.length);
+
+        const wav = new Uint8Array(44 + pcmBytes.length);
+        wav.set(new Uint8Array(header), 0);
+        wav.set(pcmBytes, 44);
+
+        const blob = new Blob([wav], { type: 'audio/wav' });
+        audioPlayer.src = URL.createObjectURL(blob);
+        playbackSection.style.display = 'block';
+        const duration = (pcmBytes.length / 4 / sRate).toFixed(1);
+        log(`Playback ready (${duration}s, ${formatBytes(wav.length)})`);
+      }
+    });
+
+    log('Ready — click Start to begin recording');
+  </script>
+</body>
+</html>

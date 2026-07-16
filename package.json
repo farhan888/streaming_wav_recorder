@@ -1,28 +1,67 @@
 {
   "name": "streaming-wav-recorder",
-  "version": "0.0.3",
-  "browser": "dist/mic.bundle.js",
-  "types": "index.d.ts",
+  "version": "1.0.0",
+  "description": "Stream microphone audio as WAV chunks using AudioWorklet",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "browser": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/",
+    "src/recorder.worklet.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "sideEffects": false,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/farhan888/streaming_wav_recorder"
   },
   "scripts": {
-    "build": "webpack",
-    "start": "webpack serve --open",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsup && cp src/recorder.worklet.js dist/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": ["recorder", "wav", "browser", "worklet", "streaming"],
-  "author": "farhan",
+  "keywords": [
+    "recorder",
+    "wav",
+    "browser",
+    "worklet",
+    "streaming",
+    "audioworklet",
+    "microphone",
+    "audio-capture",
+    "real-time-audio",
+    "typescript",
+    "whisper",
+    "deepgram",
+    "transcription",
+    "speech-to-text",
+    "web-audio-api"
+  ],
+  "author": "Farhan Anjum <farhan.saad10@gmail.com>",
   "license": "ISC",
-  "description": "",
   "devDependencies": {
-    "copy-webpack-plugin": "^12.0.2",
-    "html-webpack-plugin": "^5.6.0",
-    "ts-loader": "^9.5.1",
-    "typescript": "^5.5.2",
-    "webpack": "^5.92.1",
-    "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^5.0.4"
+    "@eslint/js": "^9.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "eslint": "^9.0.0",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.3.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.0.0"
   }
 }
